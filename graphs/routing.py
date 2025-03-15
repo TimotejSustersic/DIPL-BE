@@ -3,6 +3,7 @@ from django.urls import path
 ###################
 # endpoints
 from graphs.views.test import *
+from graphs.views.API_test import *
 
 # add all endpoint urls
 
@@ -11,6 +12,9 @@ from graphs.views.test import *
 
 urlpatterns = [
     path("test/", test, name="test"),
+    path("testOSRM/", testOSRM, name="testOSRM"),
+    path("testGEOPY/", testGEOPY, name="testGEOPY"),
+    path("testRequests/", testRequests, name="testRequests"),
 ]
 
 ###################
