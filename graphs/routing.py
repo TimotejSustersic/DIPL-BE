@@ -2,8 +2,8 @@ from django.urls import path
 
 ###################
 # endpoints
-from graphs.views.test import *
-from graphs.views.API_test import *
+from graphs.views.routing import *
+from graphs.views.vehicles import *
 
 # add all endpoint urls
 
@@ -11,10 +11,12 @@ from graphs.views.API_test import *
 # just build a loop and insert them automatically
 
 urlpatterns = [
-    path("test/", test, name="test"),
-    path("testOSRM/", testOSRM, name="testOSRM"),
-    path("testGEOPY/", testGEOPY, name="testGEOPY"),
-    path("testRequests/", testRequests, name="testRequests"),
+    path("vehicles/new", new_vehicle, name="new_vehicle"),
+    path("vehicles/query", vehicle_query, name="vehicle_query"),
+    path("vehicles/discard", vehicle_discard, name="vehicle_discard"),
+    
+    path("routing/new", routing_new, name="routing_new"),
+    path("routing/query", routing_query, name="routing_query"),
 ]
 
 ###################

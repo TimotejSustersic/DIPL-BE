@@ -5,6 +5,8 @@ import asyncio
 
 # functions
 from graphs.models.test import Test
+from graphs.utils.open_charge_map import Request_open_charge_map
+from graphs.utils.osrm import Request_osrm
 from graphs.views.utils import *
 
 from geopy.geocoders import Nominatim
@@ -40,8 +42,7 @@ def testOSRM(request: Request) -> Response:
     if user_name is None:
         return getErrorResponse(ERR_MESS_PARAMS)
     try:
-        url = "http://router.project-osrm.org/route/v1/driving/14.5058,46.0569;15.6466,46.5570"
-        response = requests.get(url).json()
+        response = Request_osrm("/route/v1/driving/14.5058,46.0569;15.6466,46.5570")
         print(response["routes"][0]["distance"])
         return Response(response, status=200)
     except Exception as e:
@@ -115,9 +116,7 @@ def testRequests(request: Request) -> Response:
     if user_name is None:
         return getErrorResponse(ERR_MESS_PARAMS)
     try:
-        key = "b6bbeeea-493a-4e01-a12b-4bfdf86a2fca"
-        url = f"https://api.openchargemap.io/v3/poi/?key={key}&countrycode=SI&maxresults=15"
-        stations = requests.get(url).json() 
+        stations = Request_open_charge_map()
         return Response(stations, status=200)
     except Exception as e:
         return getNotFoundResponse(e)
