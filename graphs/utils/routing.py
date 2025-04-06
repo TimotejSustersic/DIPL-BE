@@ -1,12 +1,16 @@
+from typing import Any, Dict
 from django.contrib.gis.geos import Point
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from graphs.models import Vehicle, Route
+from graphs.shemas.routingDTO import RouteDB, RouteDTO
 from graphs.utils.geopy import Request_geopy
 from graphs.utils.osrm import Request_osrm  # Adjust import path if needed
 
 
 class RoutingFactory:
+
+    from_history = False
 
     def __init__(self, params):
 
@@ -15,53 +19,48 @@ class RoutingFactory:
         self.start_city = self.data.get("start_city")
         self.end_city = self.data.get("end_city")
         self.vehicle_id = float(self.data.get("vehicle_id"))
-        self.battery_capacity = float(self.data.get("battery_capacity"))
+        self.battery_capacity = self.data.get("battery_capacity")
         
         # Get coordinates from city names
         geolocator = Request_geopy()
-        start_location = geolocator.geocode(self.start_city)
-        end_location = geolocator.geocode(self.end_city)
+        self.start_location = geolocator.geocode(self.start_city)
+        self.end_location = geolocator.geocode(self.end_city)
 
-        if not start_location or not end_location:
+        if not self.start_location or not self.end_location:
             raise ValueError("Invalid city name")
-        
-        self.start_lon = start_location.longitude
-        self.start_lat = start_location.latitude
-        self.end_lon = end_location.longitude
-        self.end_lat = end_location.latitude
 
 
     def startRoute(self):
         
         vehicle = Vehicle.objects.get(id=self.vehicle_id)
-        vehicle.battery_capacity = self.battery_capacity
-        vehicle.save()
+        if self.battery_capacity:
+            vehicle.battery_capacity = float(self.battery_capacity)
+            vehicle.save()
+        else:
+            self.battery_capacity = vehicle.battery_capacity
+            self.from_history = True            
+                
+        ## 
+        start_lon = self.start_location.longitude
+        start_lat = self.start_location.latitude
+        end_lon = self.end_location.longitude
+        end_lat = self.end_location.latitude
 
-        start = Point(self.start_lon, self.start_lat)
-        end = Point(self.end_lon, self.end_lat)
+        osrm_params = f"/route/v1/driving/{start_lon},{start_lat};{end_lon},{end_lat}?steps=true"
+        osrm_response = Request_osrm(osrm_params)
 
-        osrm_params = f"/route/v1/driving/{self.start_lon},{self.start_lat};{self.end_lon},{self.end_lat}?steps=true"
-
-        route = Request_osrm(osrm_params)
-        routes = route.get("routes")[0]
+        # print(osrm_response)
         
-        distance = routes.get("distance") / 1000  # km
-        geometry = routes.get("geometry")  # Polyline for frontend
+        route = RouteDB(osrm_response, vehicle, self.start_city, self.end_city, self.start_location, self.end_location)
+        
+        if not self.from_history:
+            route.save_to_db()
 
-        # Save route without waypoints (no charging needed)
-        Route.objects.create(
-            vehicle=vehicle,
-            start=start,
-            end=end,
-            start_city=self.start_city,
-            end_city=self.end_city,
-            distance=distance,
-            waypoints=[]  # Empty for now
-        )
-
-        return {
-            "distance": distance,
-            "start": [self.start_lon, self.start_lat],
-            "end": [self.end_lon, self.end_lat],
-            "geometry": geometry
-        }
+            # delete old to never exceed 10 routes
+            if Route.objects.count() > 10:
+                Route.objects.order_by('id').first().delete()  # Lowest ID = oldest
+                
+        frontend_dto = RouteDTO(osrm_response, vehicle, self.start_city, self.end_city, self.start_location, self.end_location)
+        frontend_dto.to_dict()
+        
+        return frontend_dto.to_dict()

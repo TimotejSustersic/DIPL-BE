@@ -31,6 +31,7 @@ def routing_new(request):
         # Query all Test objects
         route = RoutingFactory(request.data)
         result = route.startRoute()
+        
         return Response(result)
     except Exception as e:
         return getNotFoundResponse(e)
