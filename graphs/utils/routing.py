@@ -46,7 +46,7 @@ class RoutingFactory:
         end_lon = self.end_location.longitude
         end_lat = self.end_location.latitude
 
-        osrm_params = f"/route/v1/driving/{start_lon},{start_lat};{end_lon},{end_lat}?steps=true"
+        osrm_params = f"/route/v1/driving/{start_lon},{start_lat};{end_lon},{end_lat}?steps=true&annotations=speed"
         osrm_response = Request_osrm(osrm_params)
 
         # print(osrm_response)
