@@ -45,10 +45,7 @@ class RouteDB:
         # Distance and Time from OSRM
         try:
             routes = osrm_response["routes"]
-            # print(osrm_response.keys())
-            
             route = routes[0]
-            # print(route.keys())
             self.distance = float(route.get("distance")) / 1000  # meters to km
             self.time = float(route.get("duration"))  # seconds
         except:
@@ -81,6 +78,8 @@ class RouteDB:
 class RouteDTO(RouteDB):
     geometry: str  # OSRM polyline
     waypoints: list[dict]  # List of {name, lon, lat}
+    estimated_consumption_kwh: float
+    estimated_time_seconds: float
 
     def __init__(
             self, 
@@ -89,30 +88,35 @@ class RouteDTO(RouteDB):
             start_city: str, 
             end_city: str,
             start,
-            end
+            end,
+            estimated_consumption_kwh: float = 0.0,
+            estimated_time_seconds: float = 0.0,
         ):
         super().__init__(osrm_response, vehicle_id, start_city, end_city, start, end)
 
         # Geometry
         try:
             routes = osrm_response["routes"]
-            # print(osrm_response.keys())
-            
-            route = routes[0]
-            # print(route.keys())
-            self.geometry = route.get("geometry")
+            self.route = routes[0]
+            self.geometry = self.route.get("geometry")
         except:
             self.geometry = ""  # Default if missing
 
         # Waypoints (basic route has none, but extensible)
         self.waypoints = []  # Add logic here if waypoints come from OSRM or elsewhere
 
+        self.estimated_consumption_kwh = estimated_consumption_kwh
+        self.estimated_time_seconds = estimated_time_seconds
+
     def to_dict(self) -> Dict[str, Any]:
         base_dict = super().to_dict()
         base_dict.update(
             {
+                "route": self.route,
                 "geometry": self.geometry,
                 "waypoints": self.waypoints,
+                "estimated_consumption_kwh": self.estimated_consumption_kwh,
+                "estimated_time_seconds": self.estimated_time_seconds,
             }
         )
         return base_dict

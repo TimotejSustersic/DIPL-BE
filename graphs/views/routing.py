@@ -30,7 +30,7 @@ def routing_new(request):
     try:
         # Query all Test objects
         route = RoutingFactory(request.data)
-        result = route.startRoute()
+        result = route.start_route()
         
         return Response(result)
     except Exception as e:
