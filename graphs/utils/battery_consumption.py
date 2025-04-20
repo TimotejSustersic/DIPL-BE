@@ -118,33 +118,127 @@ class BatteryConsumptionFactory:
 
         return total_consumption
 
-    def simulate_battery_along_route(self) -> List[float]:
-        # Simulate battery state along the route segments
+    def calculate_temperature_effect_segment(self, start_coord: Dict[str, float], end_coord: Dict[str, float]) -> float:
+        # Calculate temperature effect for a segment between start and end coordinates
+        # For simplicity, average temperature at start and end points
+        temps = []
+        for coord in [start_coord, end_coord]:
+            weather = Request_weather(coord["lat"], coord["lon"])
+            if weather and "temperature" in weather:
+                temps.append(weather["temperature"])
+        if not temps:
+            avg_temp = 20  # default average temp
+        else:
+            avg_temp = sum(temps) / len(temps)
+        if avg_temp < 10:
+            temp_factor = 1.2
+        elif avg_temp > 30:
+            temp_factor = 1.15
+        else:
+            temp_factor = 1.0
+        return temp_factor
+
+    def calculate_elevation_effect_segment(self, start_coord: Dict[str, float], end_coord: Dict[str, float]) -> float:
+        # Calculate elevation effect for a segment between start and end coordinates
+        elevations = Request_elevation([(start_coord["lon"], start_coord["lat"]), (end_coord["lon"], end_coord["lat"])])
+        if not elevations or len(elevations) < 2:
+            return 1.0
+        diff = elevations[1]["elevation"] - elevations[0]["elevation"]
+        if diff > 0:
+            gain_factor = 1 + (diff / 1000)
+            loss_factor = 1.0
+        else:
+            gain_factor = 1.0
+            loss_factor = 1 - (abs(diff) / 2000)
+        elevation_factor = max(0.7, gain_factor * loss_factor)
+        return elevation_factor
+
+    def simulate_battery_along_route(self, interval_km: float = 100.0) -> List[float]:
+        # Simulate battery state along the route every interval_km kilometers
         battery_state = self.current_battery
         battery_states = []
         route = self.osrm_response.get("routes", [])[0]
         legs = route.get("legs", [])
+
+        accumulated_distance = 0.0
+        accumulated_consumption = 0.0
+        last_location = None
+        interval_start_coord = None
+
+        def apply_consumption(consumption, location):
+            nonlocal battery_state
+            battery_state -= consumption
+            battery_states.append(battery_state)
+            if battery_state <= 0:
+                self.charging_stops.append(location)
+                battery_state = self.battery_capacity  # simulate charging
+
         for leg in legs:
             for step in leg.get("steps", []):
-                distance_km = step.get("distance", 0) / 1000
-                
-                consumption = self.consumption_rate * distance_km
+                step_distance = step.get("distance", 0) / 1000  # km
+                step_speed = step.get("speed", None)
+                step_location = step.get("maneuver", {}).get("location", None)
+                step_coord = {"lon": step_location[0], "lat": step_location[1]} if step_location else None
 
-                # Adjust consumption by effects (simplified here)
-                consumption *= self.calculate_temperature_effect()
-                consumption *= self.calculate_elevation_effect()
+                # Calculate speed effect per step
+                speed_factor = 1.0
+                if step_speed is not None:
+                    speed_factor = 1 + max(0, (step_speed - 50) / 100)
 
-                # Speed effect per step
-                speed = step.get("speed", None)
-                if speed is not None:
-                    speed_factor = 1 + max(0, (speed - 50) / 100)
-                    consumption *= speed_factor
+                # Calculate consumption for this step with speed effect
+                step_consumption = self.consumption_rate * step_distance * speed_factor
 
-                battery_state -= consumption
-                battery_states.append(battery_state)
-                if battery_state <= 0:
-                    self.charging_stops.append(step.get("maneuver", {}).get("location", None))
-                    battery_state = self.battery_capacity  # simulate charging
+                if interval_start_coord is None and step_coord is not None:
+                    interval_start_coord = step_coord
+
+                # Accumulate distance and consumption
+                while step_distance > 0:
+                    remaining_to_interval = interval_km - accumulated_distance
+                    if step_distance >= remaining_to_interval:
+                        # Calculate fraction of step to complete interval
+                        fraction = remaining_to_interval / step_distance
+                        consumption_chunk = step_consumption * fraction
+                        accumulated_consumption += consumption_chunk
+                        accumulated_distance += remaining_to_interval
+
+                        # Calculate temperature and elevation effects for interval segment
+                        if interval_start_coord and step_coord:
+                            temp_effect = self.calculate_temperature_effect_segment(interval_start_coord, step_coord)
+                            elev_effect = self.calculate_elevation_effect_segment(interval_start_coord, step_coord)
+                        else:
+                            temp_effect = 1.0
+                            elev_effect = 1.0
+
+                        # Apply effects to accumulated consumption
+                        adjusted_consumption = accumulated_consumption * temp_effect * elev_effect
+
+                        apply_consumption(adjusted_consumption, step_location)
+
+                        # Reset accumulators and start coord
+                        accumulated_distance = 0.0
+                        accumulated_consumption = 0.0
+                        interval_start_coord = None
+
+                        # Reduce step distance and consumption for remaining part
+                        step_distance -= remaining_to_interval
+                        step_consumption -= consumption_chunk
+                    else:
+                        # Accumulate remaining step distance and consumption
+                        accumulated_distance += step_distance
+                        accumulated_consumption += step_consumption
+                        step_distance = 0
+
+        # Apply any remaining consumption after loop
+        if accumulated_distance > 0:
+            # Use last known coordinates for effects if available
+            if interval_start_coord and step_coord:
+                temp_effect = self.calculate_temperature_effect_segment(interval_start_coord, step_coord)
+                elev_effect = self.calculate_elevation_effect_segment(interval_start_coord, step_coord)
+            else:
+                temp_effect = 1.0
+                elev_effect = 1.0
+            adjusted_consumption = accumulated_consumption * temp_effect * elev_effect
+            apply_consumption(adjusted_consumption, step_location)
 
         self.battery_state_log = battery_states
         return battery_states
