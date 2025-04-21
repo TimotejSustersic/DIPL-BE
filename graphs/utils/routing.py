@@ -66,10 +66,10 @@ class RoutingFactory:
             if Route.objects.count() > 10:
                 Route.objects.order_by("id").first().delete()  # Lowest ID = oldest
 
-        # Calculate estimated consumption and time
-        battery_factory = BatteryConsumptionFactory(self.vehicle, osrm_response, self.battery_capacity)
-        total_consumption = battery_factory.calculate_total_consumption()
-        estimated_time = route.time  # seconds from RouteDB
+        # # Calculate estimated consumption and time
+        # battery_factory = BatteryConsumptionFactory(self.vehicle, osrm_response, self.battery_capacity)
+        # total_consumption = battery_factory.calculate_total_consumption()
+        # estimated_time = route.time  # seconds from RouteDB
 
         frontend_dto = RouteDTO(
             osrm_response,
@@ -78,27 +78,10 @@ class RoutingFactory:
             self.end_city,
             start_location,
             end_location,
-            estimated_consumption_kwh=total_consumption,
-            estimated_time_seconds=estimated_time,
+            # estimated_consumption_kwh=total_consumption,
+            # estimated_time_seconds=estimated_time,
         )
         result = frontend_dto.to_dict()
 
         return result
 
-    def find_next_charging_station(self, start_location, vehicle):
-        """
-        Find the nearest reachable charging station from start_location within battery range.
-        """
-        from graphs.utils.open_charge_map import find_nearest_charging_stations
-
-        max_distance_km = vehicle.current_battery / 100 * vehicle.battery_capacity / vehicle.consumption_rate
-        charging_stations = find_nearest_charging_stations(
-            start_location.latitude, start_location.longitude, max_distance_km=max_distance_km
-        )
-
-        if not charging_stations:
-            raise Exception("No reachable charging stations found within battery range")
-
-        charging_station = charging_stations[0]
-        charging_location = Point(charging_station["AddressInfo"]["Longitude"], charging_station["AddressInfo"]["Latitude"])
-        return charging_location

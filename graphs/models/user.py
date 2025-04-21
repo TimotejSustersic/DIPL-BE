@@ -6,6 +6,7 @@ class Vehicle(models.Model):
     battery_capacity = models.FloatField()  # kWh
     consumption_rate = models.FloatField()  # kWh/km
     current_battery = models.FloatField(default=100)  # % charge
+    year_of_manufacture = models.IntegerField()
 
     def __str__(self):
         return self.name
