@@ -60,11 +60,11 @@ def routing_query(request: Request) -> Response:
         result = [
             {
                 "vehicle_name": r.vehicle.name,
-                "current_battery": r.vehicle.current_battery,
                 "start_city": r.start_city,
                 "end_city": r.end_city,
-                "distance": r.distance,
-                "waypoints": r.waypoints,
+                "total_distance": r.total_distance,
+                "total_travel_time": r.total_travel_time,
+                "total_consumption": r.total_consumption,
             }
             for r in routes
         ]

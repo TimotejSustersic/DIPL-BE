@@ -13,17 +13,14 @@ class RouteDB:
     time: float  # seconds
 
     def __init__(
-            self, 
-            osrm_response: Dict[str, Any], 
-            vehicle: Vehicle, 
-            start_city: str, 
-            end_city: str,
-            start,
-            end
-        ):
-        
-        if not osrm_response or osrm_response.get("code") != "Ok":
-            raise ValueError("Invalid OSRM response")
+        self,
+        vehicle: Vehicle,
+        start_city: str,
+        end_city: str,
+        total_distance: int,
+        total_consumption: int,
+        total_travel_time: int,
+    ):
 
         # Vehicle
         try:
@@ -35,64 +32,52 @@ class RouteDB:
         self.start_city = str(start_city) if start_city else ""
         self.end_city = str(end_city) if end_city else ""
 
-        # Start/End
-        try:
-            self.start = Point(start.longitude, start.latitude, srid=4326)
-            self.end = Point(end.longitude, end.latitude, srid=4326)
-        except:
-            raise TypeError("Route parse error: Invalid Points")
-
         # Distance and Time from OSRM
         try:
-            routes = osrm_response["routes"]
-            route = routes[0]
-            self.distance = float(route.get("distance")) / 1000  # meters to km
-            self.time = float(route.get("duration"))  # seconds
+            self.total_distance = total_distance
+            self.total_consumption = total_consumption
+            self.total_travel_time = total_travel_time
         except:
             raise TypeError("Route parse error: Invalid distance or time")
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "vehicle": self.vehicle.name,
-            "start": [self.start.x, self.start.y],
-            "end": [self.end.x, self.end.y],
             "start_city": self.start_city,
             "end_city": self.end_city,
-            "distance": self.distance,
-            # "time": self.time,
+            "total_distance": self.total_distance,
+            "total_consumption": self.total_consumption,
+            "total_travel_time": self.total_travel_time,
         }
 
     def save_to_db(self) -> Route:
         return Route.objects.create(
             vehicle=self.vehicle,
-            start=self.start,
-            end=self.end,
             start_city=self.start_city,
             end_city=self.end_city,
-            distance=self.distance,
-            # time=self.time,
-            waypoints=[],  # Empty for basic route
+            total_distance=self.total_distance,
+            total_consumption=self.total_consumption,
+            total_travel_time=self.total_travel_time,
         )
 
 
-class RouteDTO(RouteDB):
-    geometry: str  # OSRM polyline
-    waypoints: list[dict]  # List of {name, lon, lat}
-    estimated_consumption_kwh: float
-    estimated_time_seconds: float
+class RouteDTO:
+
+    geometry: str  # OSRM
+    estimated_consumption: float
+    estimated_time: float
+    estimated_distance: float
+    start_coord: float
+    end_coord: float
 
     def __init__(
-            self, 
-            osrm_response: Dict[str, Any], 
-            vehicle_id: int, 
-            start_city: str, 
-            end_city: str,
-            start,
-            end,
-            estimated_consumption_kwh: float = 0.0,
-            estimated_time_seconds: float = 0.0,
-        ):
-        super().__init__(osrm_response, vehicle_id, start_city, end_city, start, end)
+        self,
+        osrm_response: Dict[str, Any],
+        vehicle: Vehicle,
+        start_coord,
+        end_coord,
+        total_consumption,
+    ):
 
         # Geometry
         try:
@@ -100,23 +85,29 @@ class RouteDTO(RouteDB):
             self.route = routes[0]
             self.geometry = self.route.get("geometry")
         except:
-            self.geometry = ""  # Default if missing
+            raise ValueError("Geometry is missing")
 
-        # Waypoints (basic route has none, but extensible)
-        self.waypoints = []  # Add logic here if waypoints come from OSRM or elsewhere
+        # Vehicle
+        try:
+            self.vehicle = vehicle  # Store name for simplicity
+        except Vehicle.DoesNotExist:
+            raise ValueError("Vehicle not found")
 
-        self.estimated_consumption_kwh = estimated_consumption_kwh
-        self.estimated_time_seconds = estimated_time_seconds
+        # Start/End
+        self.start_coord = start_coord
+        self.end_coord = end_coord
+
+        self.estimated_consumption = total_consumption
+        self.estimated_time = self.route.get("duration")
+        self.estimated_distance = self.route.get("distance")
 
     def to_dict(self) -> Dict[str, Any]:
-        base_dict = super().to_dict()
-        base_dict.update(
-            {
-                "route": self.route,
-                "geometry": self.geometry,
-                "waypoints": self.waypoints,
-                "estimated_consumption_kwh": self.estimated_consumption_kwh,
-                "estimated_time_seconds": self.estimated_time_seconds,
-            }
-        )
-        return base_dict
+        return {
+            # "route": self.route,
+            "geometry": self.geometry,
+            "start_coord": [self.start_coord.latitude, self.start_coord.longitude],
+            "end_coord": [self.end_coord.latitude, self.end_coord.longitude],
+            "estimated_consumption": self.estimated_consumption,
+            "estimated_time": self.estimated_time,
+            "estimated_distance": self.estimated_distance,
+        }
