@@ -8,7 +8,7 @@ from graphs.utils.util import Coordinate
 from graphs.utils.vehicle import ClassVehicle
 from graphs.utils.open_charge_map import find_charging_stations
 
-interval_km = 100
+INTERVAL_SIZE_KM = 100
 
 
 class RoutingFactory:
@@ -100,18 +100,38 @@ class RoutingFactory:
 
         total_consumption = 0.0
 
+        def calculate_consumption(step_distance, speed_factor):
+            return self.vehicle.consumption_rate * step_distance * speed_factor
+
         def process_step(step):
             nonlocal interval_distance, interval_consumption
             # Calculate consumption for this step with speed effect
             speed_factor = battery_factory.calculate_speed_effect(step)
-            step_consumption = self.vehicle.consumption_rate * step_distance * speed_factor
+            step_consumption = calculate_consumption(step_distance, speed_factor)
 
             interval_distance += step_distance
             interval_consumption += step_consumption
 
         def remaining_battery() -> float:
-            nonlocal total_consumption
-            return self.vehicle_class.current_battery - self.min_battery_capacity - total_consumption
+            nonlocal interval_consumption, total_consumption
+            return self.vehicle_class.current_battery - self.min_battery_capacity - (total_consumption + interval_consumption)
+
+        def account_interval_consumption(start_coord, end_coord) -> None:
+            nonlocal interval_consumption, total_consumption, interval_distance, interval_start_coord
+
+            if interval_consumption == 0:
+                return
+
+            temp_effect = battery_factory.calculate_temperature_effect(start_coord, end_coord)
+            elev_effect = battery_factory.calculate_elevation_effect(start_coord, end_coord)
+
+            interval_consumption *= temp_effect * elev_effect
+            total_consumption += interval_consumption
+
+            # reset interval
+            interval_distance = 0.0
+            interval_consumption = 0.0
+            interval_start_coord = end_coord
 
         interval_distance = 0.0
         interval_consumption = 0.0
@@ -127,25 +147,20 @@ class RoutingFactory:
             step_start_coord = get_coord(step)
             step_end_coord = get_coord(steps[index + 1])
 
+            # consumption was fine till this step so we put start as charging station
+            charging_coord = step_start_coord
+
+            estimated_distance = interval_distance + step_distance
+
             # Case 2: just right
             if (
-                interval_distance + step_distance > interval_km * 0.9 and interval_distance + step_distance < interval_km * 1.1
+                estimated_distance > INTERVAL_SIZE_KM * 0.9
+                and estimated_distance < INTERVAL_SIZE_KM * 1.1
             ):  # margin
-
                 process_step(step)
-
-                temp_effect = battery_factory.calculate_temperature_effect(interval_start_coord, step_end_coord)
-                elev_effect = battery_factory.calculate_elevation_effect(interval_start_coord, step_end_coord)
-                interval_consumption *= temp_effect * elev_effect
-
-                total_consumption += interval_consumption
-
-                # reset interval
-                interval_distance = 0.0
-                interval_consumption = 0.0
-                interval_start_coord = step_end_coord
+                account_interval_consumption(interval_start_coord, step_end_coord)
             # Case 3: too big
-            elif interval_distance + step_distance > interval_km:
+            elif estimated_distance > INTERVAL_SIZE_KM:
 
                 # estemate the batery drain
                 speed_factor = battery_factory.calculate_speed_effect(step)
@@ -156,15 +171,13 @@ class RoutingFactory:
                     charge_the_batery = False
 
                     # Calculate how much distance we can add to reach interval_km
-                    available_distance = interval_km - interval_distance
+                    available_distance = INTERVAL_SIZE_KM - interval_distance
 
                     if step_distance > available_distance:
 
                         # get total
-                        step_consumption = self.vehicle.consumption_rate * step_distance * speed_factor
-
-                        split_percentage = available_distance / interval_km
-
+                        step_consumption = calculate_consumption(step_distance, speed_factor)
+                        split_percentage = available_distance / INTERVAL_SIZE_KM
                         proposed_consumption = step_consumption * split_percentage
 
                         # Calculate battery left to decide if we need to split early
@@ -189,42 +202,46 @@ class RoutingFactory:
 
                         step_distance -= parsed_distance
 
-                        # Calculate consumption for the current interval with effects
-                        temp_effect = battery_factory.calculate_temperature_effect(interval_start_coord, split_coord)
-                        elev_effect = battery_factory.calculate_elevation_effect(interval_start_coord, split_coord)
-
-                        interval_consumption *= temp_effect * elev_effect
-
-                        total_consumption += interval_consumption
-
-                        # Reset interval with remaining distance and consumption
-                        interval_start_coord = split_coord
-                        interval_distance = 0.0
-                        interval_consumption = 0.0
+                        account_interval_consumption(interval_start_coord, split_coord)
 
                         if charge_the_batery:
-                            # the last check for battery will find the new charging station
+                            # battery was depleted arround this point and we have some minimum spare to get there
+                            charging_coord = split_coord
                             break
-
+                    # the remainig part of step. Last iteration
                     else:
-                        step_consumption = self.vehicle.consumption_rate * step_distance * speed_factor
+                        step_consumption = calculate_consumption(step_distance, speed_factor)
 
                         interval_distance += step_distance
                         interval_consumption += step_consumption
 
                         break
-
             # Case 1: just another step
             else:
                 process_step(step)
 
             # check if any battery left
             if remaining_battery() <= 0:
-                chargings_stations = self.find_nearest_charging_stations(Coordinate(step_start_coord))
-                charging_station, charging_station_response  = self.find_next_charging_station(step_start_coord, chargings_stations)
-                charging_station_location = Coordinate(charging_station.get("AddressInfo"))
+                chargings_stations = self.find_nearest_charging_stations(Coordinate(charging_coord))
+                # start_location is a must since its the last point on the map from which we started
+                charging_station, charging_station_response, charging_station_location = self.find_next_charging_station(
+                    start_location, chargings_stations
+                )
 
 
+                # TODO we have to check if we can reach the charging station (aka have enough capacity)
+                # if not try to get there from the start point and if not youre fucked
+                
+
+
+
+
+                # TODO sometimes the starting point is closer to the charging point than the split section
+                # the best way would be if split point would get a cuple of charging stations and we would compare the split and start coord for faster
+                # the draw back is that later you would need to charge more and might be better to get a longer route later than to go to a different point sooner
+
+                account_interval_consumption(interval_start_coord, charging_station_location)
+                
                 self.accumulated_charging_stops.append(charging_station)
 
                 routedto = RouteDTO(
@@ -243,14 +260,14 @@ class RoutingFactory:
                 # recursion
                 self.new_route(charging_station_location, self.end_location)
 
+                # since route finished early we end the cycle
+                return
+
         ###############################
         ###############################
         ###############################
-        # proccess remaining
-        temp_effect = battery_factory.calculate_temperature_effect(interval_start_coord, step_end_coord)
-        elev_effect = battery_factory.calculate_elevation_effect(interval_start_coord, step_end_coord)
-        interval_consumption *= temp_effect * elev_effect
-        total_consumption += interval_consumption
+
+        account_interval_consumption(interval_start_coord, step_end_coord)
 
         routedto = RouteDTO(
             osrm_response,
@@ -269,7 +286,7 @@ class RoutingFactory:
         while len(result) == 0:
 
             result = find_charging_stations(
-                lat=location.latitude, lon=location.longitude, max_distance_km=self.vehicle_class.min_milage * multiplier
+                lat=location.latitude, lon=location.longitude, max_distance_km=10 * multiplier
             )
             multiplier * 2
 
@@ -278,14 +295,8 @@ class RoutingFactory:
     def find_next_charging_station(self, start_loc, chargings_stations):
 
         nearest_station = chargings_stations[0]
-
-        addrInfo = nearest_station.get("AddressInfo")
-
-        response = get_OSRM(start_loc, addrInfo)
-        best_time = response.get("routes")[0].get("duration")
-
-        # TODO usually the first is the nearest but for the purpose of a thesis leave so you can write moe
-        return nearest_station, response
+        best_response = get_OSRM(start_loc, nearest_station.get("AddressInfo"))
+        best_time = best_response.get("routes")[0].get("duration")
 
         for station in chargings_stations:
 
@@ -294,9 +305,10 @@ class RoutingFactory:
 
             if time < best_time:
                 nearest_station = station
+                best_response = response
                 best_time = time
 
-        return nearest_station, response
+        return nearest_station, best_response, Coordinate(nearest_station.get("AddressInfo"))
 
 
 def get_coord(step):
@@ -304,7 +316,7 @@ def get_coord(step):
     return {"longitude": location[0], "latitude": location[1]} if location else None
 
 
-def get_OSRM(start_location, end_location, include_steps=False):
+def get_OSRM(start_location, end_location, include_steps=False, include_detail=True):
 
     parsed_start = Coordinate(start_location)
     parsed_end = Coordinate(end_location)
@@ -316,7 +328,14 @@ def get_OSRM(start_location, end_location, include_steps=False):
 
     # get route geometry
     osrm_params = f"/route/v1/driving/{start_lon},{start_lat};{end_lon},{end_lat}"
+    query_params = []
+
     if include_steps:
-        osrm_params += "?steps=true"
+        query_params.append("steps=true")
+    if include_detail:
+        query_params.append("overview=full")
+
+    if query_params:
+        osrm_params += "?" + "&".join(query_params)
 
     return Request_osrm(osrm_params)

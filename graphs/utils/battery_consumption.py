@@ -3,7 +3,7 @@ from graphs.models import Vehicle
 from graphs.utils.weather import Request_weather
 from graphs.utils.elevation import Request_elevation
 
-avg_speed = 50
+avg_speed = 50 #km/h
 
 
 class BatteryConsumptionFactory:
@@ -49,7 +49,53 @@ class BatteryConsumptionFactory:
         # Calculate speed effect per step using quadratic model
         speed_factor = 1.0
 
+        return speed_factor
+        # TODO
         if duration is not None and distance is not None:
             speed = (distance / duration) * 3.6  # v = t*s
-            speed_factor = (speed / avg_speed) ** 2
+            speed_factor += (speed / avg_speed) ** 2
         return speed_factor
+
+
+# def calculate_speed_factor(
+#     velocity: float,               # Current speed (km/h)
+#     reference_velocity: float,     # Baseline speed for known consumption (km/h)
+#     drag_coefficient: float,       # Vehicle's Cd (0.2-0.4)
+#     frontal_area: float,           # Vehicle's A (m²)
+#     rolling_resistance_coeff: float,  # Cr (0.008-0.015)
+#     vehicle_mass: float,           # kg
+#     air_density: float = 1.225,    # kg/m³ (default sea level)
+#     gravity: float = 9.81          # m/s²
+# ) -> float:
+#     """
+#     Calculates the speed adjustment factor for EV energy consumption.
+#     Returns: Multiplier for base consumption rate at reference speed.
+#     """
+#     # Aerodynamic drag component (v³ term)
+#     drag_force = 0.5 * air_density * drag_coefficient * frontal_area * velocity**3
+    
+#     # Rolling resistance component (v² and v terms)
+#     rolling_resistance = vehicle_mass * gravity * rolling_resistance_coeff * (
+#         0.01 * velocity**2 + 0.0002 * velocity  # Empirical coefficients
+#     )
+    
+#     # Reference speed components
+#     ref_drag = 0.5 * air_density * drag_coefficient * frontal_area * reference_velocity**3
+#     ref_rolling = vehicle_mass * gravity * rolling_resistance_coeff * (
+#         0.01 * reference_velocity**2 + 0.0002 * reference_velocity
+#     )
+
+#     return (drag_force + rolling_resistance) / (ref_drag + ref_rolling)
+
+# # Example: Tesla Model 3 at 90 km/h vs 60 km/h baseline
+# speed_factor = calculate_speed_factor(
+#     velocity=90,
+#     reference_velocity=60,
+#     drag_coefficient=0.23,
+#     frontal_area=2.22,  # m²
+#     rolling_resistance_coeff=0.01,
+#     vehicle_mass=1800  # kg
+# )
+
+# base_consumption = 0.15  # kWh/km at 60 km/h
+# adjusted_consumption = base_consumption * speed_factor  # Now 0.15 × 1.85 ≈ 0.278 kWh/km
