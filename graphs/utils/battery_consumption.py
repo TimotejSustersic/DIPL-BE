@@ -46,18 +46,20 @@ class BatteryConsumptionFactory:
         duration = step.get("duration", None)
         distance = step.get("distance", None)
 
-        # Calculate speed effect per step using quadratic model
-        speed_factor = 1.0
+        speed_factor = 1.0  # Default factor if data is missing
 
-        return speed_factor
-        # TODO
-        if duration is not None and distance is not None:
-            speed = (distance / duration) * 3.6  # v = t*s
+        if duration is not None and distance is not None and duration > 0:
+            speed = (distance / duration) * 3.6  # Convert m/s to km/h
+            # Quadratic model: consumption increases with square of speed ratio
             speed_factor += (speed / avg_speed) ** 2
+
+            # Clamp speed_factor to a reasonable range to avoid extreme values
+            speed_factor = max(0.8, min(speed_factor, 2.0))
+
         return speed_factor
 
 
-# def calculate_speed_factor(
+# def calculate_speed_effect(
 #     velocity: float,               # Current speed (km/h)
 #     reference_velocity: float,     # Baseline speed for known consumption (km/h)
 #     drag_coefficient: float,       # Vehicle's Cd (0.2-0.4)
@@ -88,7 +90,7 @@ class BatteryConsumptionFactory:
 #     return (drag_force + rolling_resistance) / (ref_drag + ref_rolling)
 
 # # Example: Tesla Model 3 at 90 km/h vs 60 km/h baseline
-# speed_factor = calculate_speed_factor(
+# speed_factor = calculate_speed_effect(
 #     velocity=90,
 #     reference_velocity=60,
 #     drag_coefficient=0.23,
