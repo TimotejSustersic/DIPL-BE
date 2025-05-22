@@ -31,7 +31,7 @@ def routing_new(request):
         # Query all Test objects
         route = RoutingFactory(request.data)
         result = route.start_route()
-        
+
         return Response(result)
     except Exception as e:
         return getNotFoundResponse(e)
@@ -56,7 +56,7 @@ def routing_query(request: Request) -> Response:
 
     try:
         routes = Route.objects.all()[::-1]
-        
+
         result = [
             {
                 "vehicle_name": r.vehicle.name,

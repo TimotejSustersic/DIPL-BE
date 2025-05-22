@@ -15,9 +15,7 @@ def getErrorResponse(message: str, e: Exception = None) -> Response:
         error_message = f"{message}: {str(e)}"
     else:
         error_message = message
-    return Response(
-        {"message": error_message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-    )
+    return Response({"message": error_message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def getNotFoundResponse(e: Exception = None) -> Response:

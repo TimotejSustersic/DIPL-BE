@@ -227,19 +227,7 @@ class RoutingFactory:
                 charging_station, charging_station_response, charging_station_location = self.find_next_charging_station(
                     start_location, chargings_stations
                 )
-
-
-                # TODO we have to check if we can reach the charging station (aka have enough capacity)
-                # if not try to get there from the start point and if not youre fucked
                 
-
-
-
-
-                # TODO sometimes the starting point is closer to the charging point than the split section
-                # the best way would be if split point would get a cuple of charging stations and we would compare the split and start coord for faster
-                # the draw back is that later you would need to charge more and might be better to get a longer route later than to go to a different point sooner
-
                 account_interval_consumption(interval_start_coord, charging_station_location)
                 
                 self.accumulated_charging_stops.append(charging_station)

@@ -4,6 +4,7 @@ from django.urls import path
 # endpoints
 from graphs.views.routing import *
 from graphs.views.vehicles import *
+from graphs.views.testing import *
 
 # add all endpoint urls
 
@@ -17,6 +18,10 @@ urlpatterns = [
     
     path("routing/new", routing_new, name="routing_new"),
     path("routing/query", routing_query, name="routing_query"),
+
+    path("testing/items/query", test_items_query, name="testing_itemsQuery"),
+    path("testing/query", test_query, name="testing_query"),
+    path("testing/new", test_new, name="testing_new"),
 ]
 
 ###################
