@@ -19,8 +19,8 @@ urlpatterns = [
     path("routing/new", routing_new, name="routing_new"),
     path("routing/query", routing_query, name="routing_query"),
 
+    path("tests/query", tests_query, name="tests_query"),
     path("testing/items/query", test_items_query, name="testing_itemsQuery"),
-    path("testing/query", test_query, name="testing_query"),
     path("testing/new", test_new, name="testing_new"),
 ]
 

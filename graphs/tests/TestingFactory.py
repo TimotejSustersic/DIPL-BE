@@ -1,5 +1,5 @@
 import json
-from graphs.models.test import TestRoute
+from graphs.models.test import Test, TestRoute
 from graphs.models.user import Vehicle
 from graphs.utils.geopy import Request_geopy
 from graphs.utils.routing import RoutingFactory, get_OSRM
@@ -10,8 +10,16 @@ class TestingFactory:
 
     def __init__(self, params):
 
+        self.name = params.get("name")
         self.cities = Parse_str_to_list(params.get("cities", []))
         self.battery_capacity = int(params.get("battery_capacity", 100))
+
+        test = Test.objects.create(
+            name= self.name,
+            battery_capacity=self.battery_capacity,
+            cities=self.cities,
+        )
+        test.save()
 
     def run_tests(self):
 
@@ -63,6 +71,7 @@ class TestingFactory:
         response = {
             "accumulated_routes": [route.to_dict() for route in routing_factory.accumulated_routes],
             "accumulated_charging_stops": routing_factory.accumulated_charging_stops,
+            "accumulated_empty_battery": routing_factory.accumulated_empty_battery,
             "total_distance": total_distance,
             "total_time": total_time,
             "total_consumption": total_consumption,
@@ -80,6 +89,7 @@ class TestingFactory:
 
         my_accumulated_routes = [route.get("geometry", "") for route in routing_response.get("accumulated_routes")]
         my_accumulated_charging_stops = [Coordinate(coord.get("AddressInfo")).to_string() for coord in routing_response.get("accumulated_charging_stops")]
+        my_accumulated_empty_battery = [Coordinate(coord).to_string() for coord in routing_response.get("accumulated_empty_battery")]
 
         test_route = TestRoute.objects.create(
             start_city=str(start_city),
@@ -91,6 +101,7 @@ class TestingFactory:
             osrm_total_distance=int(osrm_route.get("distance", 0)),
             my_accumulated_routes=my_accumulated_routes,
             my_accumulated_charging_stops=my_accumulated_charging_stops,
+            my_accumulated_empty_battery=my_accumulated_empty_battery,
             my_total_time=int(routing_response.get("total_time", 0)),
             my_total_distance=int(routing_response.get("total_distance", 0)),
         )

@@ -1,5 +1,5 @@
 from itertools import combinations
-from graphs.models.test import TestRoute, TestRouteSerializer
+from graphs.models.test import Test, TestRoute, TestRouteSerializer
 from graphs.tests.TestingFactory import TestingFactory
 from graphs.views.utils import *
 
@@ -11,7 +11,32 @@ from graphs.views.utils import *
     method="post",
     request_body=openapi.Schema(
         type=openapi.TYPE_OBJECT,
+        properties={},
+    ),
+)
+@api_view(["POST"])
+def tests_query(request):
+    if not isPOST(request):
+        return getNotallowedResponse()
+
+    try:
+        output = list(Test.objects.values("name", "id", "cities", "battery_capacity"))
+
+        return Response(output)
+    except Exception as e:
+        return getNotFoundResponse(e)
+
+
+########################################
+########################################
+
+
+@swagger_auto_schema(
+    method="post",
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
         properties={
+            "id": openapi.Schema(type=openapi.TYPE_STRING),
             "search": openapi.Schema(type=openapi.TYPE_STRING),
         },
     ),
@@ -22,61 +47,35 @@ def test_items_query(request):
         return getNotallowedResponse()
 
     try:
+        test_id = request.data.get("id")
         search = request.data.get("search", "").strip().lower()
 
-        # Filter and select only start_city, end_city directly in the database
-        if search:
-            routes = TestRoute.objects.filter(
-                start_city__icontains=search
-            ) | TestRoute.objects.filter(
-                end_city__icontains=search
-            )
-            routes = routes.values("start_city", "end_city").distinct()
-        else:
-            routes = TestRoute.objects.values("start_city", "end_city").distinct()
+        # Retrieve the Test instance
+        test_instance = Test.objects.get(id=test_id)
+        cities = test_instance.cities
 
-        output = []
-        if routes:
-            output = list(routes)
-        # Return queryset directly as JSON
-        return Response(output)
+        # Generate all possible city pairs (combinations)
+        city_pairs = list(combinations(cities, 2))
+
+        # Build Q objects for filtering TestRoute by city pairs in both directions
+        from django.db.models import Q
+
+        query = Q()
+        for start_city, end_city in city_pairs:
+            query |= Q(start_city=start_city, end_city=end_city) | Q(start_city=end_city, end_city=start_city)
+
+        routes = TestRoute.objects.filter(query)
+
+        # If search string is given, filter routes by partial match on start_city or end_city
+        if search:
+            routes = routes.filter(Q(start_city__icontains=search) | Q(end_city__icontains=search))
+
+        serializer = TestRouteSerializer(routes, many=True)
+        return Response(serializer.data)
+    except Test.DoesNotExist:
+        return getNotFoundResponse("Test with given id does not exist.")
     except Exception as e:
         return getNotFoundResponse(e)
-
-
-@swagger_auto_schema(
-    method="post",
-    request_body=openapi.Schema(
-        type=openapi.TYPE_OBJECT,
-        properties={
-            "start_city": openapi.Schema(type=openapi.TYPE_STRING),
-            "end_city": openapi.Schema(type=openapi.TYPE_STRING),
-        },
-        required=[
-            "start_city",
-            "end_city",
-        ],
-    ),
-)
-@api_view(["POST"])
-def test_query(request):
-    if not isPOST(request):
-        return getNotallowedResponse()
-
-    try:
-        start_city = request.data.get("start_city")
-        end_city = request.data.get("end_city")
-        
-        route = TestRoute.objects.get(start_city=start_city, end_city=end_city)
-        serializer = TestRouteSerializer(route)
-        return Response(serializer.data)
-    except Exception as e:
-        try:
-            route = TestRoute.objects.get(start_city=end_city, end_city=start_city)            
-            serializer = TestRouteSerializer(route)
-            return Response(serializer.data)
-        except Exception as e:
-            return getNotFoundResponse(e)
 
 
 @swagger_auto_schema(

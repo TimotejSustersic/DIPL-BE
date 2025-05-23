@@ -3,6 +3,19 @@ from django.contrib.postgres.fields import ArrayField
 from rest_framework import serializers
 
 
+class Test(models.Model):
+    cities = ArrayField(
+        models.CharField(max_length=100),
+        default=list,
+        blank=True,
+    )
+    name = models.CharField(max_length=200)
+    battery_capacity = models.IntegerField()
+
+    def __str__(self):
+        return "Test"
+
+
 class TestRoute(models.Model):
     start_city = models.CharField(max_length=200)
     end_city = models.CharField(max_length=200)
@@ -17,6 +30,11 @@ class TestRoute(models.Model):
         blank=False,
     )
     my_accumulated_charging_stops = ArrayField(
+        models.CharField(max_length=100),
+        default=list,
+        blank=True,
+    )
+    my_accumulated_empty_battery = ArrayField(
         models.CharField(max_length=100),
         default=list,
         blank=True,
@@ -48,6 +66,7 @@ class TestRouteSerializer(serializers.ModelSerializer):
             "osrm_total_distance",
             "my_accumulated_routes",
             "my_accumulated_charging_stops",
+            "my_accumulated_empty_battery",
             "my_total_distance",
             "my_total_time",
         ]

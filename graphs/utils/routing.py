@@ -46,6 +46,7 @@ class RoutingFactory:
 
         self.accumulated_routes: List[RouteDTO] = []
         self.accumulated_charging_stops = []
+        self.accumulated_empty_battery = []
 
         self.new_route(self.start_location, self.end_location)
 
@@ -222,6 +223,8 @@ class RoutingFactory:
 
             # check if any battery left
             if remaining_battery() <= 0:
+                self.accumulated_empty_battery.append(Coordinate(charging_coord).to_tuple())
+                
                 chargings_stations = self.find_nearest_charging_stations(Coordinate(charging_coord))
                 # start_location is a must since its the last point on the map from which we started
                 charging_station, charging_station_response, charging_station_location = self.find_next_charging_station(
