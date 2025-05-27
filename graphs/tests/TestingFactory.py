@@ -1,8 +1,8 @@
 import json
 from graphs.models.test import Test, TestRoute
 from graphs.models.user import Vehicle
-from graphs.utils.geopy import Request_geopy
-from graphs.utils.routing import RoutingFactory, get_OSRM
+from graphs.apis.geopy import Request_geopy
+from graphs.utils.RoutingFactory import RoutingFactory, get_OSRM
 from graphs.utils.util import Coordinate, Parse_str_to_list
 
 
@@ -61,6 +61,7 @@ class TestingFactory:
 
         routing_factory.accumulated_routes = []
         routing_factory.accumulated_charging_stops = []
+        routing_factory.accumulated_empty_battery = []
 
         routing_factory.new_route(routing_factory.start_location, routing_factory.end_location)
 
@@ -89,7 +90,7 @@ class TestingFactory:
 
         my_accumulated_routes = [route.get("geometry", "") for route in routing_response.get("accumulated_routes")]
         my_accumulated_charging_stops = [Coordinate(coord.get("AddressInfo")).to_string() for coord in routing_response.get("accumulated_charging_stops")]
-        my_accumulated_empty_battery = [Coordinate(coord).to_string() for coord in routing_response.get("accumulated_empty_battery")]
+        my_accumulated_empty_battery = routing_response.get("accumulated_empty_battery")
 
         test_route = TestRoute.objects.create(
             start_city=str(start_city),

@@ -1,7 +1,7 @@
 from typing import Dict
 from graphs.models import Vehicle
-from graphs.utils.weather import Request_weather
-from graphs.utils.elevation import Request_elevation
+from graphs.apis.weather import Request_weather
+from graphs.apis.elevation import Request_elevation
 
 avg_speed = 50 #km/h
 

@@ -1,12 +1,12 @@
 from typing import Any, Dict, List
 from graphs.models import Vehicle, Route
 from graphs.shemas.routingDTO import RouteDB, RouteDTO
-from graphs.utils.geopy import Request_geopy
-from graphs.utils.osrm import Request_osrm  # Adjust import path if needed
+from graphs.apis.geopy import Request_geopy
+from graphs.apis.osrm import Request_osrm  # Adjust import path if needed
 from graphs.utils.battery_consumption import BatteryConsumptionFactory
 from graphs.utils.util import Coordinate
 from graphs.utils.vehicle import ClassVehicle
-from graphs.utils.open_charge_map import find_charging_stations
+from graphs.apis.open_charge_map import find_charging_stations
 
 INTERVAL_SIZE_KM = 100
 
@@ -17,15 +17,13 @@ class RoutingFactory:
 
     def __init__(self, params):
 
-        self.data = params
+        self.start_city = params.get("start_city")
+        self.end_city = params.get("end_city")
 
-        self.start_city = self.data.get("start_city")
-        self.end_city = self.data.get("end_city")
-
-        vehicle_id = int(self.data.get("vehicle_id"))
+        vehicle_id = int(params.get("vehicle_id"))
         self.vehicle = Vehicle.objects.get(id=vehicle_id)
 
-        current_battery = self.data.get("battery_capacity", None)
+        current_battery = params.get("battery_capacity", None)
         if not current_battery:
             self.from_history = True
         else:
@@ -41,6 +39,9 @@ class RoutingFactory:
 
         if not self.start_location or not self.end_location:
             raise ValueError("Invalid city name")
+        
+        # Expansion
+        self.additional_charging_stations = params.get("additional_charging_stations", [])
 
     def start_route(self):
 
@@ -75,6 +76,7 @@ class RoutingFactory:
         response = {
             "accumulated_routes": [route.to_dict() for route in self.accumulated_routes],
             "accumulated_charging_stops": self.accumulated_charging_stops,
+            "accumulated_empty_battery": self.accumulated_empty_battery,
             "total_distance": total_distance,
             "total_time": total_time,
             "total_consumption": total_consumption,
@@ -223,9 +225,12 @@ class RoutingFactory:
 
             # check if any battery left
             if remaining_battery() <= 0:
-                self.accumulated_empty_battery.append(Coordinate(charging_coord).to_tuple())
+                self.accumulated_empty_battery.append(Coordinate(charging_coord).to_string())
                 
                 chargings_stations = self.find_nearest_charging_stations(Coordinate(charging_coord))
+                # here we add additioanl charging stations we might get trough infrastructure testing
+                if self.additional_charging_stations:
+                    chargings_stations.extend(self.additional_charging_stations)
                 # start_location is a must since its the last point on the map from which we started
                 charging_station, charging_station_response, charging_station_location = self.find_next_charging_station(
                     start_location, chargings_stations
@@ -285,21 +290,67 @@ class RoutingFactory:
 
     def find_next_charging_station(self, start_loc, chargings_stations):
 
-        nearest_station = chargings_stations[0]
-        best_response = get_OSRM(start_loc, nearest_station.get("AddressInfo"))
-        best_time = best_response.get("routes")[0].get("duration")
+        def distance(coord1, coord2):
+            from math import radians, cos, sin, asin, sqrt
+
+            lon1, lat1 = coord1.longitude, coord1.latitude
+            lon2, lat2 = coord2.longitude, coord2.latitude
+
+            # convert decimal degrees to radians
+            lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+
+            # haversine formula
+            dlon = lon2 - lon1
+            dlat = lat2 - lat1
+            a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+            c = 2 * asin(sqrt(a))
+            r = 6371  # Radius of earth in kilometers
+            return c * r
+
+        # Filter charging stations to nearest 5 based on geographic distance to start_loc
+        start_coord = Coordinate(start_loc)
+        stations_with_distance = []
 
         for station in chargings_stations:
+            location = getattr(station, "AddressInfo", None)
+            if not location:
+                location = station
+            station_coord = Coordinate(location)
+            dist = distance(start_coord, station_coord)
+            stations_with_distance.append((dist, station))
 
-            response = get_OSRM(start_loc, station.get("AddressInfo"))
+        stations_with_distance.sort(key=lambda x: x[0])
+        filtered_stations = [station for _, station in stations_with_distance[:5]]
+
+        nearest_station = filtered_stations[0]
+        nearest_station_location = nearest_station
+        try:
+            nearest_station_location = nearest_station.get("AddressInfo", None)
+        except:
+            nearest_station_location = nearest_station
+        if not nearest_station_location:
+            nearest_station_location = nearest_station
+        best_response = get_OSRM(start_loc, nearest_station_location)
+        best_time = best_response.get("routes")[0].get("duration")
+
+        for station in filtered_stations:
+
+            location = station
+            try:
+                location = station.get("AddressInfo", None)
+            except:
+                location = station
+               
+            response = get_OSRM(start_loc, location)
             time = response.get("routes")[0].get("duration")
 
             if time < best_time:
                 nearest_station = station
+                nearest_station_location = location
                 best_response = response
                 best_time = time
 
-        return nearest_station, best_response, Coordinate(nearest_station.get("AddressInfo"))
+        return nearest_station, best_response, Coordinate(nearest_station_location)
 
 
 def get_coord(step):

@@ -1,5 +1,5 @@
 from graphs.models.user import Route
-from graphs.utils.routing import RoutingFactory
+from graphs.utils.RoutingFactory import RoutingFactory
 from graphs.views.utils import *
 
 ########################################

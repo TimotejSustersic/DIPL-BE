@@ -11,7 +11,9 @@ from graphs.views.utils import *
     method="post",
     request_body=openapi.Schema(
         type=openapi.TYPE_OBJECT,
-        properties={},
+        properties={
+            "get_empty": openapi.Schema(type=openapi.TYPE_STRING),
+        },
     ),
 )
 @api_view(["POST"])
@@ -21,6 +23,29 @@ def tests_query(request):
 
     try:
         output = list(Test.objects.values("name", "id", "cities", "battery_capacity"))
+
+        if bool(request.data.get("get_empty")):
+            from django.db.models import Q
+            for i in range(len(output)):
+                test_cities = output[i]["cities"]
+                # Generate all possible city pairs (combinations)
+                city_pairs = list(combinations(test_cities, 2))
+
+                # Build Q objects for filtering TestRoute by city pairs in both directions
+                query = Q()
+                for start_city, end_city in city_pairs:
+                    query |= Q(start_city=start_city, end_city=end_city) | Q(start_city=end_city, end_city=start_city)
+
+                # Query TestRoute for these city pairs
+                routes = TestRoute.objects.filter(query)
+
+                # Collect and flatten all my_accumulated_empty_battery arrays from these routes
+                empty_battery_locations = []
+                for route in routes:
+                    empty_battery_locations.extend(route.my_accumulated_empty_battery)
+
+                # Add the combined array to the test output
+                output[i]["my_accumulated_empty_battery"] = empty_battery_locations
 
         return Response(output)
     except Exception as e:
@@ -36,7 +61,7 @@ def tests_query(request):
     request_body=openapi.Schema(
         type=openapi.TYPE_OBJECT,
         properties={
-            "id": openapi.Schema(type=openapi.TYPE_STRING),
+            "test_id": openapi.Schema(type=openapi.TYPE_STRING),
             "search": openapi.Schema(type=openapi.TYPE_STRING),
         },
     ),
@@ -47,7 +72,7 @@ def test_items_query(request):
         return getNotallowedResponse()
 
     try:
-        test_id = request.data.get("id")
+        test_id = request.data.get("test_id")
         search = request.data.get("search", "").strip().lower()
 
         # Retrieve the Test instance

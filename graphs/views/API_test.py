@@ -5,8 +5,8 @@ import asyncio
 
 # functions
 from graphs.models.test import Test
-from graphs.utils.open_charge_map import Request_open_charge_map
-from graphs.utils.osrm import Request_osrm
+from graphs.apis.open_charge_map import Request_open_charge_map
+from graphs.apis.osrm import Request_osrm
 from graphs.views.utils import *
 
 from geopy.geocoders import Nominatim
