@@ -2,7 +2,7 @@ from django.contrib.gis.db import models
 from django.contrib.postgres.fields import ArrayField
 from rest_framework import serializers
 
-from graphs.models.test import Test, TestRoute
+from graphs.models.test import Test, TestRoute, TestRouteSerializer
 
 
 class TestInstance(models.Model):
@@ -18,11 +18,13 @@ class TestInstance(models.Model):
 
     def __str__(self):
         return "TestInstance"
-    
+
+
 class TestInstanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = TestInstance
-        fields = ['id', 'name', 'charging_stops', 'avg_distance_diff', 'avg_time_diff']
+        fields = ["id", "name", "charging_stops", "avg_distance_diff", "avg_time_diff"]
+
 
 class TestInstanceRoute(models.Model):
     test_instance = models.ForeignKey(TestInstance, on_delete=models.CASCADE)
@@ -45,6 +47,9 @@ class TestInstanceRoute(models.Model):
 
 
 class TestInstanceRouteSerializer(serializers.ModelSerializer):
+    test_instance = TestInstanceSerializer()
+    test_route = TestRouteSerializer()
+
     class Meta:
         model = TestInstanceRoute
         fields = [

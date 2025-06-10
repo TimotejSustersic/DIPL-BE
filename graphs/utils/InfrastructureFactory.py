@@ -18,7 +18,7 @@ class InfrastructureFactory:
 
         self.infrastructure = [Coordinate(coord) for coord in params.get("additional_charging_stations", [])]
 
-    def get_problematic_routes(self, distance_threshold_km=5) -> list[TestRoute]:
+    def get_problematic_routes(self, distance_threshold_km=4) -> list[TestRoute]:
         city_pairs = list(combinations(self.test.cities, 2))
         query = Q()
         for start_city, end_city in city_pairs:
@@ -27,7 +27,7 @@ class InfrastructureFactory:
         test_routes = TestRoute.objects.filter(query)
 
         problematic_routes = [
-            route for route in test_routes if route.osrm_total_distance - route.my_total_distance / 1000 > distance_threshold_km
+            route for route in test_routes if ((route.my_total_distance - route.osrm_total_distance) / 1000) > distance_threshold_km
         ]
 
         return problematic_routes
@@ -71,6 +71,9 @@ class InfrastructureFactory:
 
         problematic_routes = self.get_problematic_routes()
 
+        if not problematic_routes:
+            return
+
         distance_diff_sum = 0
         time_diff_sum = 0
         counter = 0
@@ -78,6 +81,7 @@ class InfrastructureFactory:
         # Store run_route results to avoid redundant calls
         route_responses = {}
 
+        # run algoritem and get data
         for problematic_route in problematic_routes:
             new_route_response = self.run_route(problematic_route)
             route_responses[problematic_route.id] = new_route_response
@@ -108,6 +112,7 @@ class InfrastructureFactory:
         )
         new_test_instance.save()
 
+        # store data
         for problematic_route in problematic_routes:
             new_route_response = route_responses.get(problematic_route.id)
 

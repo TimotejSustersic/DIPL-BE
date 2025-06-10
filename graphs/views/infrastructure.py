@@ -26,7 +26,8 @@ def infrastructure_query(request):
 
     try:
         test_id = request.data.get("test_id")
-        output = list(TestInstance.objects.filter(id=test_id).values("test", "name", "charging_stops"))
+       
+        output = list(TestInstance.objects.filter(test=test_id).values("id", "test", "name", "charging_stops"))
 
         return Response(output)
     except Exception as e:
@@ -43,6 +44,7 @@ def infrastructure_query(request):
         type=openapi.TYPE_OBJECT,
         properties={
             "test_id": openapi.Schema(type=openapi.TYPE_STRING),
+            "test_instance_id": openapi.Schema(type=openapi.TYPE_STRING),
         },
     ),
 )
@@ -53,11 +55,12 @@ def infrastructure_items_query(request):
 
     try:
         test_id = request.data.get("test_id")
+        test_instance_id = request.data.get("test_instance_id")
 
         # Retrieve the Test instance
-        test_instance = TestInstance.objects.get(id=test_id)
+        test_instance = TestInstance.objects.get(test=test_id, id=test_instance_id)
 
-        routes = TestInstanceRoute.objects.filter(test=test_instance)
+        routes = TestInstanceRoute.objects.filter(test_instance=test_instance)
 
         serializer = TestInstanceRouteSerializer(routes, many=True)
         return Response(serializer.data)
