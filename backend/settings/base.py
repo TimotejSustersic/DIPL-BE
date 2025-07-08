@@ -22,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # Application definition
 INSTALLED_APPS = [
     # libs
-    "channels",
+    # "channels",
     "rest_framework",
     "corsheaders",
     "drf_yasg",
@@ -74,35 +74,6 @@ ASGI_APPLICATION = "backend.asgi.application"
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
 }
-
-# Database
-# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        # 'ENGINE': 'django.db.backends.postgresql',
-        'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'DIPL_DB',  # Name of your database
-        'USER': 'postgres',  # Database user
-        'PASSWORD': 'admin',  # Password for the user
-        'HOST': 'localhost',  # Can be an IP or domain for remote DB
-        'PORT': '5432',  # Default port for PostgreSQL
-    }
-}
-
-if os.name == 'nt':
-    GDAL_LIBRARY_PATH = r'C:\GDAL\bin\gdal.dll'
-    GEOS_LIBRARY_PATH = r'C:\GDAL\bin\geos_c.dll'
-
-# if os.name == 'nt':
-#     GDAL_LIBRARY_PATH = r'C:\OSGeo4W\bin\gdal310.dll'  # Adjust to exact DLL name
-#     GEOS_LIBRARY_PATH = r'C:\OSGeo4W\bin\geos_c.dll'   # Optional
-
-# os.environ["GDAL_LIBRARY_PATH"] = r"C:\OSGeo4W\bin\gdal310.dll"
-# os.environ['GEOS_LIBRARY_PATH'] = r"C:\OSGeo4W\bin\geos_c.dll"
-
-# os.environ["GDAL_LIBRARY_PATH"] = r"C:\Users\ts8755\AppData\Local\anaconda3\envs\gis_env\Library\bin\gdal310.dll"
-# os.environ["GEOS_LIBRARY_PATH"] = r"C:\Users\ts8755\AppData\Local\anaconda3\envs\gis_env\Library\bin\geos_c.dll"
 
 
 # Password validation

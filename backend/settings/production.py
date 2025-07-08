@@ -11,15 +11,18 @@ DEBUG = False
 ALLOWED_HOSTS = ["*"]
 # ALLOWED_HOSTS = [get_secret("ALLOWED_HOST")]
 
-FIREBASE_CONFIG = {
-    "apiKey": get_secret("FIREBASE_API_KEY"),
-    "authDomain": get_secret("FIREBASE_AUTH_DOMAIN"),
-    "projectId": get_secret("FIREBASE_PROJECT_ID"),
-    "storageBucket": get_secret("FIREBASE_STORAGE_BUCKET"),
-    "messagingSenderId": get_secret("FIREBASE_MESSAGING_SENDER_ID"),
-    "appId": get_secret("FIREBASE_APP_ID"),
-    "databaseURL": get_secret("FIREBASE_DATABASE_URL"),
+DB_CONFIG = {
+    'ENGINE': 'django.db.backends.postgresql',
+    "HOST": get_secret("CLOUD_SQL_CONNECTION_NAME"),
+    "NAME": get_secret("DB_NAME"),
+    "USER": get_secret("DB_USER"),
+    "PASSWORD": get_secret("DB_PASSWORD"),
+    'PORT': '5432',  # Default port for PostgreSQL
 }
 
-API_KEY = get_secret("API_KEY")
-API_SECRET_KEY = get_secret("API_SECRET_KEY")
+# Database
+# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
+
+DATABASES = {
+    'default': DB_CONFIG
+}

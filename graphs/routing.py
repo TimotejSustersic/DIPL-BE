@@ -7,6 +7,7 @@ from graphs.views.vehicles import *
 from graphs.views.testing import *
 from graphs.views.infrastructure import *
 from graphs.views.admin import *
+from graphs.views.API_test import *
 
 # add all endpoint urls
 
@@ -35,4 +36,7 @@ urlpatterns = [
     path("admin/clear/TestRoute", clear_TestRoute, name="clear_TestRoute"),
     path("admin/clear/Route", clear_Route, name="clear_Route"),
     path("admin/clear/Vehicle", clear_Vehicle, name="clear_Vehicle"),
+    
+    path("test", testGEOPY, name="test1"),
+    path("testOSRM", testOSRM, name="test2"),
 ]

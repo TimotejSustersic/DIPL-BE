@@ -1,6 +1,6 @@
-from django.contrib.gis.db import models
 from django.contrib.postgres.fields import ArrayField
 from rest_framework import serializers
+from django.db import models
 
 
 class Test(models.Model):

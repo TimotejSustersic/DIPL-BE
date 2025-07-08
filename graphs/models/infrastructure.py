@@ -1,4 +1,4 @@
-from django.contrib.gis.db import models
+from django.db import models
 from django.contrib.postgres.fields import ArrayField
 from rest_framework import serializers
 
@@ -9,7 +9,7 @@ class TestInstance(models.Model):
     test = models.ForeignKey(Test, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     charging_stops = ArrayField(
-        models.CharField(max_length=100),
+        models.CharField(max_length=101),
         default=list,
         blank=True,
     )

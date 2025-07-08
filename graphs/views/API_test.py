@@ -1,11 +1,9 @@
 # utils
 # import pandas as pd
 # libraries
-import asyncio
+
 
 # functions
-from graphs.models.test import Test
-from graphs.apis.open_charge_map import Request_open_charge_map
 from graphs.apis.osrm import Request_osrm
 from graphs.views.utils import *
 
@@ -55,21 +53,11 @@ def testOSRM(request: Request) -> Response:
 
 
 @swagger_auto_schema(
-    method="post",
-    request_body=openapi.Schema(
-        type=openapi.TYPE_OBJECT,
-        properties={
-            "user_name": openapi.Schema(type=openapi.TYPE_STRING),
-        },
-        required=[
-            "user_name",
-        ],
-    ),
+    method="get"
 )
-@api_view(["POST"])
-def testGEOPY(request: Request) -> Response:
-    if not isPOST(request):
-        return getNotallowedResponse()
+@api_view(["GET"])
+def testGEOPY() -> Response:    
+    return Response({"city": "Ljubljana"}, status=200)
 
     user_name = request.data.get("user_name")
 

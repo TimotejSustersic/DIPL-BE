@@ -1,13 +1,9 @@
 from typing import Any, Dict
-from django.contrib.gis.geos import Point
 from graphs.models import Vehicle, Route
-from graphs.models.test import TestRoute
 
 
 class RouteDB:
     vehicle: Vehicle
-    start: Point  # GIS Point
-    end: Point  # GIS Point
     start_city: str
     end_city: str
     distance: float  # km
