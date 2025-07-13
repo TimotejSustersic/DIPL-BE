@@ -46,6 +46,8 @@ class TestingFactory:
 
                     self.store_route_result(start_city, end_city, routing_response, osrm_route, start_location, end_location)
 
+        return True
+    
     def start_test_route(self, start_city, end_city):
 
         first_vehicle = Vehicle.objects.first()
