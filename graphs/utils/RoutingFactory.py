@@ -284,7 +284,7 @@ class RoutingFactory:
             result = find_charging_stations(
                 lat=location.latitude, lon=location.longitude, max_distance_km=10 * multiplier
             )
-            multiplier * 2
+            multiplier *= 2
 
         return result
 
