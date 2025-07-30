@@ -225,21 +225,27 @@ class RoutingFactory:
 
             # check if any battery left
             if remaining_battery() <= 0:
-                self.accumulated_empty_battery.append(Coordinate(charging_coord).to_string())
-                
-                chargings_stations = self.find_nearest_charging_stations(Coordinate(charging_coord))
-                # here we add additioanl charging stations we might get trough infrastructure testing
+                # save location for testing
+                self.accumulated_empty_battery.append(
+                    Coordinate(charging_coord).to_string()
+                )
+                # find all nearest charging stations
+                chargings_stations = self.find_nearest_charging_stations(
+                    Coordinate(charging_coord)
+                )
+                # add additioanl charging stations we might get trough infrastructure testing
                 if self.additional_charging_stations:
                     chargings_stations.extend(self.additional_charging_stations)
-                # start_location is a must since its the last point on the map from which we started
+                # find next charging station. Look for the nearest to the start location
                 charging_station, charging_station_response, charging_station_location = self.find_next_charging_station(
                     start_location, chargings_stations
                 )
                 
+                # now that we saw the route account consumption to maintain statistics
                 account_interval_consumption(interval_start_coord, charging_station_location)
-                
+                # add location to charging stop array
                 self.accumulated_charging_stops.append(charging_station)
-
+                # create route
                 routedto = RouteDTO(
                     charging_station_response,
                     self.vehicle,
@@ -247,15 +253,11 @@ class RoutingFactory:
                     charging_station_location,
                     total_consumption,
                 )
-
                 self.accumulated_routes.append(routedto)
-
                 # charge the battery (it's possible initial battery capacity is not full)
                 self.vehicle_class.recharge_battery()
-
-                # recursion
+                # end recursion
                 self.new_route(charging_station_location, self.end_location)
-
                 # since route finished early we end the cycle
                 return
 
